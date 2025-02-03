@@ -103,6 +103,8 @@ param openAiApiOrganization string = ''
 param documentIntelligenceServiceName string = '' // Set in main.parameters.json
 param documentIntelligenceResourceGroupName string = '' // Set in main.parameters.json
 
+/*
+Commenting out so that Document Intelligence service can be deployed to Canada Central
 // Limited regions for new version:
 // https://learn.microsoft.com/azure/ai-services/document-intelligence/concept-layout
 @description('Location for the Document Intelligence resource group')
@@ -113,6 +115,7 @@ param documentIntelligenceResourceGroupName string = '' // Set in main.parameter
   }
 })
 param documentIntelligenceResourceGroupLocation string
+*/
 
 param documentIntelligenceSkuName string // Set in main.parameters.json
 
@@ -622,7 +625,7 @@ module documentIntelligence 'br/public:avm/res/cognitive-services/account:0.7.2'
     networkAcls: {
       defaultAction: 'Allow'
     }
-    location: documentIntelligenceResourceGroupLocation
+    //location: documentIntelligenceResourceGroupLocation
     disableLocalAuth: true
     tags: tags
     sku: documentIntelligenceSkuName
