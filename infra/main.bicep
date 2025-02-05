@@ -108,7 +108,7 @@ param documentIntelligenceServiceName string = '' // Set in main.parameters.json
 param documentIntelligenceResourceGroupName string = '' // Set in main.parameters.json
 
 /*
-Commenting out the following parameters to enable Docuemtn Intelligence service to be deployed in Canada.
+Commenting out the following parameters to enable Document Intelligence service to be deployed in Canada.
 Original deployment mandated specific locations which supported preview features used in document cracking and chunking
 
 // Limited regions for new version:
