@@ -5,6 +5,9 @@ targetScope = 'subscription'
 @description('Name of the the environment which is used to generate a short unique hash used in all resources.')
 param environmentName string
 
+param projectName string
+param instanceNumber string
+
 @minLength(1)
 @description('Primary location for all resources')
 param location string
@@ -13,7 +16,7 @@ param appServicePlanName string = '' // Set in main.parameters.json
 param backendServiceName string = '' // Set in main.parameters.json
 param resourceGroupName string = '' // Set in main.parameters.json
 
-param applicationInsightsDashboardName string = '' // Set in main.parameters.json
+//param applicationInsightsDashboardName string = '' // Set in main.parameters.json
 param applicationInsightsName string = '' // Set in main.parameters.json
 param logAnalyticsName string = '' // Set in main.parameters.json
 
@@ -101,7 +104,12 @@ param openAiApiKey string = ''
 param openAiApiOrganization string = ''
 
 param documentIntelligenceServiceName string = '' // Set in main.parameters.json
+
 param documentIntelligenceResourceGroupName string = '' // Set in main.parameters.json
+
+/*
+Commenting out the following parameters to enable Docuemtn Intelligence service to be deployed in Canada.
+Original deployment mandated specific locations which supported preview features used in document cracking and chunking
 
 // Limited regions for new version:
 // https://learn.microsoft.com/azure/ai-services/document-intelligence/concept-layout
@@ -113,6 +121,7 @@ param documentIntelligenceResourceGroupName string = '' // Set in main.parameter
   }
 })
 param documentIntelligenceResourceGroupLocation string
+*/
 
 param documentIntelligenceSkuName string // Set in main.parameters.json
 
@@ -252,11 +261,11 @@ param azureContainerAppsWorkloadProfile string
 
 @allowed(['appservice', 'containerapps'])
 param deploymentTarget string = 'appservice'
-param acaIdentityName string = deploymentTarget == 'containerapps' ? '${environmentName}-aca-identity' : ''
-param acaManagedEnvironmentName string = deploymentTarget == 'containerapps' ? '${environmentName}-aca-env' : ''
-param containerRegistryName string = deploymentTarget == 'containerapps'
-  ? '${replace(toLower(environmentName), '-', '')}acr'
-  : ''
+//param acaIdentityName string = ''
+param acaManagedEnvironmentName string = ''
+//param containerRegistryName string = deploymentTarget == 'containerapps'
+//  ? '${projectName}${environmentName}${abbrs.containerRegistryRegistries}${instanceNumber}'
+//  : ''
 
 // Configure CORS for allowing different web apps to use the backend
 // For more information please see https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
@@ -269,7 +278,7 @@ var allowedOrigins = reduce(filter(union(split(allowedOrigin, ';'), allMsftAllow
 
 // Organize resources in a resource group
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
-  name: !empty(resourceGroupName) ? resourceGroupName : '${abbrs.resourcesResourceGroups}${environmentName}'
+  name: !empty(resourceGroupName) ? resourceGroupName : '${projectName}-${environmentName}-${abbrs.resourcesResourceGroups}'
   location: location
   tags: tags
 }
@@ -315,32 +324,32 @@ module monitoring 'core/monitor/monitoring.bicep' = if (useApplicationInsights) 
     tags: tags
     applicationInsightsName: !empty(applicationInsightsName)
       ? applicationInsightsName
-      : '${abbrs.insightsComponents}${resourceToken}'
+      : '${projectName}-${environmentName}-${abbrs.insightsComponents}${instanceNumber}'
     logAnalyticsName: !empty(logAnalyticsName)
       ? logAnalyticsName
-      : '${abbrs.operationalInsightsWorkspaces}${resourceToken}'
+      : '${projectName}-${environmentName}-${abbrs.operationalInsightsWorkspaces}${instanceNumber}'
     publicNetworkAccess: publicNetworkAccess
   }
 }
 
-module applicationInsightsDashboard 'backend-dashboard.bicep' = if (useApplicationInsights) {
+/* module applicationInsightsDashboard 'backend-dashboard.bicep' = if (useApplicationInsights) {
   name: 'application-insights-dashboard'
   scope: resourceGroup
   params: {
     name: !empty(applicationInsightsDashboardName)
       ? applicationInsightsDashboardName
-      : '${abbrs.portalDashboards}${resourceToken}'
+      : '${projectName}-${environmentName}-${abbrs.portalDashboards}${instanceNumber}'
     location: location
     applicationInsightsName: useApplicationInsights ? monitoring.outputs.applicationInsightsName : ''
   }
-}
+} */
 
 // Create an App Service Plan to group applications under the same payment plan and SKU
 module appServicePlan 'core/host/appserviceplan.bicep' = if (deploymentTarget == 'appservice') {
   name: 'appserviceplan'
   scope: resourceGroup
   params: {
-    name: !empty(appServicePlanName) ? appServicePlanName : '${abbrs.webServerFarms}${resourceToken}'
+    name: !empty(appServicePlanName) ? appServicePlanName : '${projectName}-${environmentName}-${abbrs.webServerFarms}${instanceNumber}'
     location: location
     tags: tags
     sku: {
@@ -424,7 +433,7 @@ module backend 'core/host/appservice.bicep' = if (deploymentTarget == 'appservic
   name: 'web'
   scope: resourceGroup
   params: {
-    name: !empty(backendServiceName) ? backendServiceName : '${abbrs.webSitesAppService}backend-${resourceToken}'
+    name: !empty(backendServiceName) ? backendServiceName : '${projectName}-${environmentName}-${abbrs.webSitesAppService}${instanceNumber}'
     location: location
     tags: union(tags, { 'azd-service-name': 'backend' })
     // Need to check deploymentTarget again due to https://github.com/Azure/bicep/issues/3990
@@ -459,7 +468,7 @@ module acaIdentity 'core/security/aca-identity.bicep' = if (deploymentTarget == 
   name: 'aca-identity'
   scope: resourceGroup
   params: {
-    identityName: acaIdentityName
+    identityName: '${projectName}-${environmentName}-${abbrs.managedIdentityUserAssignedIdentities}${instanceNumber}'
     location: location
   }
 }
@@ -472,8 +481,8 @@ module containerApps 'core/host/container-apps.bicep' = if (deploymentTarget == 
     tags: tags
     location: location
     workloadProfile: azureContainerAppsWorkloadProfile
-    containerAppsEnvironmentName: acaManagedEnvironmentName
-    containerRegistryName: '${containerRegistryName}${resourceToken}'
+    containerAppsEnvironmentName: '${projectName}-${environmentName}-${abbrs.appManagedEnvironments}${instanceNumber}'
+    containerRegistryName: replace('${projectName}${environmentName}${abbrs.containerRegistryRegistries}${instanceNumber}', '-', '')
     logAnalyticsWorkspaceResourceId: useApplicationInsights ? monitoring.outputs.logAnalyticsWorkspaceId : ''
   }
 }
@@ -487,9 +496,9 @@ module acaBackend 'core/host/container-app-upsert.bicep' = if (deploymentTarget 
     acaIdentity
   ]
   params: {
-    name: !empty(backendServiceName) ? backendServiceName : '${abbrs.webSitesContainerApps}backend-${resourceToken}'
+    name: !empty(backendServiceName) ? backendServiceName : '${projectName}-${environmentName}-${abbrs.webSitesContainerApps}${instanceNumber}'
     location: location
-    identityName: (deploymentTarget == 'containerapps') ? acaIdentityName : ''
+    identityName: (deploymentTarget == 'containerapps') ? acaIdentity.outputs.identityName : ''
     exists: webAppExists
     workloadProfile: azureContainerAppsWorkloadProfile
     containerRegistryName: (deploymentTarget == 'containerapps') ? containerApps.outputs.registryName : ''
@@ -587,13 +596,13 @@ module openAi 'br/public:avm/res/cognitive-services/account:0.7.2' = if (isAzure
   name: 'openai'
   scope: openAiResourceGroup
   params: {
-    name: !empty(openAiServiceName) ? openAiServiceName : '${abbrs.cognitiveServicesAccounts}${resourceToken}'
+    name: !empty(openAiServiceName) ? openAiServiceName : '${projectName}-${environmentName}-${abbrs.azureOpenAiService}${instanceNumber}'
     location: openAiLocation
     tags: tags
     kind: 'OpenAI'
-    customSubDomainName: !empty(openAiServiceName)
+     customSubDomainName: !empty(openAiServiceName)
       ? openAiServiceName
-      : '${abbrs.cognitiveServicesAccounts}${resourceToken}'
+      : '${projectName}-${environmentName}-${abbrs.azureOpenAiService}${instanceNumber}'
     publicNetworkAccess: publicNetworkAccess
     networkAcls: {
       defaultAction: 'Allow'
@@ -613,16 +622,16 @@ module documentIntelligence 'br/public:avm/res/cognitive-services/account:0.7.2'
   params: {
     name: !empty(documentIntelligenceServiceName)
       ? documentIntelligenceServiceName
-      : '${abbrs.cognitiveServicesDocumentIntelligence}${resourceToken}'
+      : '${projectName}-${environmentName}-${abbrs.cognitiveServicesDocumentIntelligence}${instanceNumber}'
     kind: 'FormRecognizer'
-    customSubDomainName: !empty(documentIntelligenceServiceName)
+     customSubDomainName: !empty(documentIntelligenceServiceName)
       ? documentIntelligenceServiceName
-      : '${abbrs.cognitiveServicesDocumentIntelligence}${resourceToken}'
+      : '${projectName}-${environmentName}-${abbrs.cognitiveServicesDocumentIntelligence}${instanceNumber}'
     publicNetworkAccess: publicNetworkAccess
     networkAcls: {
       defaultAction: 'Allow'
     }
-    location: documentIntelligenceResourceGroupLocation
+    //location: documentIntelligenceResourceGroupLocation
     disableLocalAuth: true
     tags: tags
     sku: documentIntelligenceSkuName
@@ -635,14 +644,14 @@ module computerVision 'br/public:avm/res/cognitive-services/account:0.7.2' = if 
   params: {
     name: !empty(computerVisionServiceName)
       ? computerVisionServiceName
-      : '${abbrs.cognitiveServicesComputerVision}${resourceToken}'
+      : '${projectName}-${environmentName}-${abbrs.cognitiveServicesComputerVision}${instanceNumber}'
     kind: 'ComputerVision'
     networkAcls: {
       defaultAction: 'Allow'
     }
     customSubDomainName: !empty(computerVisionServiceName)
       ? computerVisionServiceName
-      : '${abbrs.cognitiveServicesComputerVision}${resourceToken}'
+      : '${abbrs.cognitiveServicesComputerVision}${instanceNumber}'
     location: computerVisionResourceGroupLocation
     tags: tags
     sku: computerVisionSkuName
@@ -675,14 +684,14 @@ module speech 'br/public:avm/res/cognitive-services/account:0.7.2' = if (useSpee
   name: 'speech-service'
   scope: speechResourceGroup
   params: {
-    name: !empty(speechServiceName) ? speechServiceName : '${abbrs.cognitiveServicesSpeech}${resourceToken}'
+    name: !empty(speechServiceName) ? speechServiceName : '${projectName}-${environmentName}-${abbrs.cognitiveServicesSpeech}${instanceNumber}'
     kind: 'SpeechServices'
     networkAcls: {
       defaultAction: 'Allow'
     }
     customSubDomainName: !empty(speechServiceName)
       ? speechServiceName
-      : '${abbrs.cognitiveServicesSpeech}${resourceToken}'
+      : '${abbrs.cognitiveServicesSpeech}${instanceNumber}'
     location: !empty(speechServiceLocation) ? speechServiceLocation : location
     tags: tags
     sku: speechServiceSkuName
@@ -692,7 +701,7 @@ module searchService 'core/search/search-services.bicep' = {
   name: 'search-service'
   scope: searchServiceResourceGroup
   params: {
-    name: !empty(searchServiceName) ? searchServiceName : 'gptkb-${resourceToken}'
+    name: !empty(searchServiceName) ? searchServiceName : '${projectName}-${environmentName}-${abbrs.searchSearchServices}${instanceNumber}'
     location: !empty(searchServiceLocation) ? searchServiceLocation : location
     tags: tags
     disableLocalAuth: true
@@ -703,7 +712,7 @@ module searchService 'core/search/search-services.bicep' = {
     publicNetworkAccess: publicNetworkAccess == 'Enabled'
       ? 'enabled'
       : (publicNetworkAccess == 'Disabled' ? 'disabled' : null)
-    sharedPrivateLinkStorageAccounts: usePrivateEndpoint ? [storage.outputs.id] : []
+    //sharedPrivateLinkStorageAccounts: usePrivateEndpoint ? [storage.outputs.id] : []
   }
 }
 
@@ -720,7 +729,7 @@ module storage 'core/storage/storage-account.bicep' = {
   name: 'storage'
   scope: storageResourceGroup
   params: {
-    name: !empty(storageAccountName) ? storageAccountName : '${abbrs.storageStorageAccounts}${resourceToken}'
+    name: !empty(storageAccountName) ? storageAccountName : replace('${projectName}${environmentName}${abbrs.storageStorageAccounts}${instanceNumber}', '-', '')
     location: storageResourceGroupLocation
     tags: tags
     publicNetworkAccess: publicNetworkAccess
@@ -753,7 +762,7 @@ module userStorage 'core/storage/storage-account.bicep' = if (useUserUpload) {
   params: {
     name: !empty(userStorageAccountName)
       ? userStorageAccountName
-      : 'user${abbrs.storageStorageAccounts}${resourceToken}'
+      : 'user${abbrs.storageStorageAccounts}${instanceNumber}'
     location: storageResourceGroupLocation
     tags: tags
     publicNetworkAccess: publicNetworkAccess
@@ -777,7 +786,7 @@ module cosmosDb 'br/public:avm/res/document-db/database-account:0.6.1' = if (use
   name: 'cosmosdb'
   scope: cosmosDbResourceGroup
   params: {
-    name: !empty(cosmosDbAccountName) ? cosmosDbAccountName : '${abbrs.documentDBDatabaseAccounts}${resourceToken}'
+    name: !empty(cosmosDbAccountName) ? cosmosDbAccountName : '${projectName}-${environmentName}-${abbrs.documentDBDatabaseAccounts}${instanceNumber}'
     location: !empty(cosmosDbLocation) ? cosmosDbLocation : location
     locations: [
       {
@@ -1062,7 +1071,7 @@ module isolation 'network-isolation.bicep' = {
     deploymentTarget: deploymentTarget
     location: location
     tags: tags
-    vnetName: '${abbrs.virtualNetworks}${resourceToken}'
+    vnetName: '${abbrs.virtualNetworks}${instanceNumber}'
     // Need to check deploymentTarget due to https://github.com/Azure/bicep/issues/3990
     appServicePlanName: deploymentTarget == 'appservice' ? appServicePlan.outputs.name : ''
     usePrivateEndpoint: usePrivateEndpoint
