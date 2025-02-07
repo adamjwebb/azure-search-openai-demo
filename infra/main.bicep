@@ -233,7 +233,7 @@ param useVectors bool = false
 param useIntegratedVectorization bool = false
 
 @description('Use media description feature with Azure Content Understanding during ingestion')
-param useMediaDescriberAzureCU bool = true
+param useMediaDescriberAzureCU bool = false
 
 @description('Enable user document upload feature')
 param useUserUpload bool = false
